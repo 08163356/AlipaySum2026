@@ -244,6 +244,71 @@ async def get_combinations():
     return combinations
 
 
+@app.get("/api/search")
+async def search_user(name: str):
+    """根据姓名查询用户的匹配状态"""
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="请输入姓名")
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # 查找用户
+    cursor.execute(
+        "SELECT id, name, score, locked FROM users WHERE name LIKE ?",
+        (f"%{name.strip()}%",)
+    )
+    users = cursor.fetchall()
+    
+    if not users:
+        conn.close()
+        return {
+            "found": False,
+            "message": f"未找到名字包含 '{name}' 的用户"
+        }
+    
+    results = []
+    for user in users:
+        user_data = {
+            "id": user['id'],
+            "name": user['name'],
+            "score": user['score'],
+            "locked": bool(user['locked']),
+            "status": "已匹配" if user['locked'] else "等待配对",
+            "combination": None
+        }
+        
+        # 如果已锁定，查找所属组合
+        if user['locked']:
+            cursor.execute("""
+                SELECT c.id, c.user1_id, c.user2_id, c.user3_id
+                FROM combinations c
+                WHERE c.user1_id = ? OR c.user2_id = ? OR c.user3_id = ?
+            """, (user['id'], user['id'], user['id']))
+            combo = cursor.fetchone()
+            
+            if combo:
+                cursor.execute(
+                    "SELECT id, name, score FROM users WHERE id IN (?, ?, ?)",
+                    (combo['user1_id'], combo['user2_id'], combo['user3_id'])
+                )
+                combo_users = [dict(u) for u in cursor.fetchall()]
+                user_data["combination"] = {
+                    "id": combo['id'],
+                    "users": combo_users,
+                    "total": sum(u['score'] for u in combo_users)
+                }
+        
+        results.append(user_data)
+    
+    conn.close()
+    return {
+        "found": True,
+        "count": len(results),
+        "results": results
+    }
+
+
 @app.get("/api/stats")
 async def get_stats():
     """获取统计信息"""

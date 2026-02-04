@@ -303,6 +303,91 @@
                 transform: scale(1.02);
             }
         }
+
+        /* 查询模块样式 */
+        .search-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px dashed #e0e0e0;
+        }
+
+        .search-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .search-result.matched {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-left: 4px solid #4caf50;
+        }
+
+        .search-result.waiting {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-left: 4px solid #ff9800;
+        }
+
+        .search-result.not-found {
+            background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+            border-left: 4px solid #f44336;
+        }
+
+        .search-result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .status-tag {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .status-tag.matched {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status-tag.waiting {
+            background: #ff9800;
+            color: white;
+        }
+
+        .search-combo-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 8px;
+        }
+
+        .search-combo-users {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .mini-chip {
+            background: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .mini-chip.highlight {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-search {
+            background: linear-gradient(135deg, #43a047 0%, #1b5e20 100%);
+        }
     </style>
 </head>
 <body>
@@ -349,6 +434,18 @@
                             <p>暂无参与者</p>
                         </div>
                     </div>
+                </div>
+
+                <div class="search-section">
+                    <h2>🔍 查询匹配状态</h2>
+                    <form id="searchForm">
+                        <div class="form-group">
+                            <label for="searchName">输入姓名查询</label>
+                            <input type="text" id="searchName" placeholder="请输入要查询的姓名">
+                        </div>
+                        <button type="submit" class="btn btn-search" id="searchBtn">查询</button>
+                    </form>
+                    <div id="searchResults"></div>
                 </div>
             </div>
 
@@ -540,6 +637,72 @@
                 toast.remove();
             }, 3000);
         }
+
+        // 查询表单提交
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const searchInput = document.getElementById('searchName');
+            const searchBtn = document.getElementById('searchBtn');
+            const resultsContainer = document.getElementById('searchResults');
+            
+            const name = searchInput.value.trim();
+            
+            if (!name) {
+                showToast('请输入要查询的姓名', true);
+                return;
+            }
+            
+            searchBtn.disabled = true;
+            searchBtn.textContent = '查询中...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/search?name=${encodeURIComponent(name)}`);
+                const result = await response.json();
+                
+                if (!result.found) {
+                    resultsContainer.innerHTML = `
+                        <div class="search-result not-found">
+                            <div class="search-result-header">
+                                <span>❌ ${result.message}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultsContainer.innerHTML = result.results.map(user => `
+                        <div class="search-result ${user.locked ? 'matched' : 'waiting'}">
+                            <div class="search-result-header">
+                                <span><strong>${user.name}</strong> (分数: ${user.score})</span>
+                                <span class="status-tag ${user.locked ? 'matched' : 'waiting'}">
+                                    ${user.status}
+                                </span>
+                            </div>
+                            ${user.combination ? `
+                                <div class="search-combo-info">
+                                    <div>🎉 已组成 2026 组合！</div>
+                                    <div class="search-combo-users">
+                                        ${user.combination.users.map(u => `
+                                            <span class="mini-chip ${u.name === user.name ? 'highlight' : ''}">${u.name}: ${u.score}</span>
+                                        `).join('<span>+</span>')}
+                                        <span>= <strong>2026</strong></span>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div style="color: #666; font-size: 0.9rem; margin-top: 5px;">
+                                    ⏳ 正在等待其他参与者，组成 2026 组合...
+                                </div>
+                            `}
+                        </div>
+                    `).join('');
+                }
+                
+            } catch (error) {
+                showToast('查询失败: ' + error.message, true);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.textContent = '查询';
+            }
+        });
     </script>
 </body>
 </html>
