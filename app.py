@@ -4,6 +4,8 @@
 - 自动查找三人分数和等于2026的组合
 - 找到的组合锁定，不再参与后续计算
 """
+from __future__ import annotations
+from typing import Optional, List, Tuple
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -89,11 +91,11 @@ class UserResponse(BaseModel):
 
 class CombinationResponse(BaseModel):
     id: int
-    users: list[UserResponse]
+    users: List[UserResponse]
     total: int
 
 
-def find_combination_for_new_user(conn, new_user_id: int, new_score: int) -> tuple | None:
+def find_combination_for_new_user(conn, new_user_id: int, new_score: int) -> Optional[Tuple[int, int]]:
     """
     为新用户查找是否存在两个未锁定用户，三人分数和为2026
     返回 (user1_id, user2_id) 或 None
